@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Sync</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+    <div id="player-container">
+        <iframe id="player" width="640" height="360" 
+                src="https://www.youtube.com/embed/{{ name }}?enablejsapi=1&autoplay=1" 
+                frameborder="0" allow="autoplay" allowfullscreen></iframe>
+    </div>
+
+    <script>
+        const socket = io();
+        let player;
+
+        // Initialize YouTube IFrame API
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                events: {
+                    onReady: onPlayerReady,
+                    onStateChange: onPlayerStateChange,
+                }
+            });
+        }
+
+        // Sync the video when the player is ready
+        function onPlayerReady(event) {
+            if ("{{ start_time }}" > 0) {
+                player.seekTo(parseFloat("{{ start_time }}"), true);
+            }
+
+            // Request sync for any updates
+            socket.emit("sync_request");
+        }
+
+        // Broadcast changes to video state
+        function onPlayerStateChange(event) {
+            const state = event.data;
+            const currentTime = player.getCurrentTime();
+
+            socket.emit("update_time", {
+                time: currentTime,
+            });
+        }
+
+        // Receive video sync data
+        socket.on("sync_video", (data) => {
+            if (!player) return;
+
+            const { id, time } = data;
+
+            if (player.getVideoData().video_id !== id) {
+                player.loadVideoById(id, time);
+            } else {
+                player.seekTo(time, true);
+            }
+        });
+    </script>
+</body>
+</html>
